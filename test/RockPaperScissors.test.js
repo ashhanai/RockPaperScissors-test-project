@@ -15,6 +15,7 @@ describe("RockPaperScissors contract", () => {
 	});
 
 	describe("Challange player", () => {
+
 		it("should accept valid challenge", async () => {
 			let hash = ethers.utils.hashMessage("0_secret");
 			await token.connect(player1).approve(contract.address, 10);
@@ -50,5 +51,49 @@ describe("RockPaperScissors contract", () => {
 
 			expect(await token.balanceOf(contract.address)).to.equal(10);
 		});
+
 	});
+
+	describe("Play move", () => {
+
+		it("should fail if no game in progress", async () => {
+			try {
+				await token.connect(player2).approve(contract.address, 10);
+				await contract.connect(player2).playMove(player1.address, 2);
+				expect.fail();
+			} catch(error) {
+				expect(error.message.indexOf("revert No game in progress")).to.be.at.least(0);
+			}
+		});
+
+		it("should transfer staked tokens to contract", async () => {
+			expect(await token.balanceOf(contract.address)).to.equal(0);
+
+			let hash = ethers.utils.hashMessage("0_secret");
+			await token.connect(player1).approve(contract.address, 10);
+			await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+			await token.connect(player2).approve(contract.address, 10);
+			await contract.connect(player2).playMove(player1.address, 2);
+
+			expect(await token.balanceOf(contract.address)).to.equal(20);
+		});
+
+		it("should update game", async () => {
+			let hash = ethers.utils.hashMessage("0_secret");
+			await token.connect(player1).approve(contract.address, 10);
+			await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+			await token.connect(player2).approve(contract.address, 10);
+			await contract.connect(player2).playMove(player1.address, 2);
+
+			let game = await contract.games(player1.address, player2.address);
+			expect(game.stake).to.equal(10);
+			expect(game.secretMove).to.equal(hash);
+			expect(game.move).to.equal(2);
+			expect(game.state).to.equal(3);
+		});
+
+	});
+
 });

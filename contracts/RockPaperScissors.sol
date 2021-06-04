@@ -30,13 +30,9 @@ contract RockPaperScissors {
 	}
 
 	function challengePlayer(address _player2, uint _stake, bytes32 _secretMove) public {
-		// 1. Should not have two challanged games
 		require(!isGameInProgress(games[msg.sender][_player2]), "Another challange in progress");
-		
-		// 2. Send tokens to contract
-		require(token.transferFrom(msg.sender, address(this), _stake));
+		require(token.transferFrom(msg.sender, address(this), _stake), "Token transfer failed");
 
-		// 3. Create game
 		games[msg.sender][_player2] = Game({
 			lastUpdate: block.timestamp,
 			stake: _stake,
@@ -46,12 +42,14 @@ contract RockPaperScissors {
 		});
 	}
 
-	function playMove(address _player1, uint _move) public {
-		// 1. Check that game is created
-		// 2. Check that move is within round limit (5 min)
-		// 3. Send tokens to contract
-		// 4. Save the move
-		// 5. Update the game
+	function playMove(address _player1, Move _move) public {
+		Game storage game = games[_player1][msg.sender];
+		require(isGameInProgress(game), "No game in progress");
+		require(token.transferFrom(msg.sender, address(this), game.stake), "Token transfer failed");
+
+		game.move = _move;
+		game.lastUpdate = block.timestamp;
+		game.state = State.Played;
 	}
 
 	function revealMove(address _player2, string memory _secret) public {
