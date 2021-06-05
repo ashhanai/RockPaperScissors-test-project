@@ -427,6 +427,8 @@ describe("RockPaperScissors contract", () => {
 				const receipt = await tx.wait();
 				const event = receipt.events[receipt.events.length - 1];
 				expect(event.event).to.equal("ChallengedWithdraw");
+				expect(event.args._challenger).to.equal(player1.address);
+				expect(event.args._challenged).to.equal(player2.address);
 			});
 
 		});
