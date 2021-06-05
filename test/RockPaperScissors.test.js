@@ -52,6 +52,18 @@ describe("RockPaperScissors contract", () => {
 			expect(await token.balanceOf(contract.address)).to.equal(10);
 		});
 
+		it("should emit Challenge event", async () => {
+			await token.connect(player1).approve(contract.address, 10);
+			const tx = await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+			const receipt = await tx.wait();
+			const event = receipt.events[receipt.events.length - 1];
+			expect(event.event).to.equal("Challenge");
+			expect(event.args._challenger).to.equal(player1.address);
+			expect(event.args._challenged).to.equal(player2.address);
+			expect(event.args._stake).to.equal(10);
+		});
+
 	});
 
 	describe("Play move", () => {
@@ -106,6 +118,21 @@ describe("RockPaperScissors contract", () => {
 			expect(game.secretMove).to.equal(hash);
 			expect(game.move).to.equal(2);
 			expect(game.state).to.equal(3);
+		});
+
+		it("should emit Play event", async () => {
+			await token.connect(player1).approve(contract.address, 10);
+			await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+			await token.connect(player2).approve(contract.address, 10);
+			const tx = await contract.connect(player2).playMove(player1.address, 2);
+
+			const receipt = await tx.wait();
+			const event = receipt.events[receipt.events.length - 1];
+			expect(event.event).to.equal("Play");
+			expect(event.args._challenger).to.equal(player1.address);
+			expect(event.args._challenged).to.equal(player2.address);
+			expect(event.args._move).to.equal(2);
 		});
 
 	});
@@ -226,6 +253,24 @@ describe("RockPaperScissors contract", () => {
 			expect(game.state).to.equal(5);
 		});
 
+		it("should emit Finish event", async () => {
+			await token.connect(player1).approve(contract.address, 10);
+			await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+			await token.connect(player2).approve(contract.address, 10);
+			await contract.connect(player2).playMove(player1.address, 2);
+
+			const tx = await contract.connect(player1).revealMove(player2.address, 1, "secret");
+
+			const receipt = await tx.wait();
+			const event = receipt.events[receipt.events.length - 1];
+			expect(event.event).to.equal("Finish");
+			expect(event.args._challenger).to.equal(player1.address);
+			expect(event.args._challenged).to.equal(player2.address);
+			expect(event.args._move).to.equal(1);
+			expect(event.args._result).to.equal(2);
+		});
+
 	});
 
 	describe("Withdraw", () => {
@@ -278,6 +323,21 @@ describe("RockPaperScissors contract", () => {
 
 				let game = await contract.games(player1.address, player2.address);
 				expect(game.state).to.equal(2);
+			});
+
+			it("should emit ChallengerWithdraw event", async () => {
+				await token.connect(player1).approve(contract.address, 10);
+				await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+				time.increase(40 * 60);
+
+				const tx = await contract.connect(player1).withdraw(player2.address, true);
+
+				const receipt = await tx.wait();
+				const event = receipt.events[receipt.events.length - 1];
+				expect(event.event).to.equal("ChallengerWithdraw");
+				expect(event.args._challenger).to.equal(player1.address);
+				expect(event.args._challenged).to.equal(player2.address);
 			});
 
 		});
@@ -351,6 +411,22 @@ describe("RockPaperScissors contract", () => {
 
 				let game = await contract.games(player1.address, player2.address);
 				expect(game.state).to.equal(4);
+			});
+
+			it("should emit ChallengedWithdraw event", async () => {
+				await token.connect(player1).approve(contract.address, 10);
+				await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+				await token.connect(player2).approve(contract.address, 10);
+				await contract.connect(player2).playMove(player1.address, 2);
+
+				time.increase(40 * 60);
+
+				const tx = await contract.connect(player2).withdraw(player1.address, false);
+
+				const receipt = await tx.wait();
+				const event = receipt.events[receipt.events.length - 1];
+				expect(event.event).to.equal("ChallengedWithdraw");
 			});
 
 		});

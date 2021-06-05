@@ -21,7 +21,34 @@ contract RockPaperScissors {
 
 	mapping(address => mapping(address => Game)) public games;
 
-	// TODO: Add events
+	event Challenge(
+		address indexed _challenger,
+		address indexed _challenged,
+		uint _stake
+	);
+
+	event ChallengerWithdraw(
+		address indexed _challenger,
+		address indexed _challenged
+	);
+
+	event Play(
+		address indexed _challenger,
+		address indexed _challenged,
+		Move _move
+	);
+
+	event ChallengedWithdraw(
+		address indexed _challenger,
+		address indexed _challenged
+	);
+
+	event Finish(
+		address indexed _challenger,
+		address indexed _challenged,
+		Move _move,
+		Result _result
+	);
 
 
 	// Public functions
@@ -42,6 +69,8 @@ contract RockPaperScissors {
 			move: Move.None,
 			state: State.Challenged
 		});
+
+		emit Challenge(msg.sender, _player2, _stake);
 	}
 
 	function playMove(address _player1, Move _move) public {
@@ -52,6 +81,8 @@ contract RockPaperScissors {
 		game.move = _move;
 		game.lastUpdate = block.timestamp;
 		game.state = State.Played;
+
+		emit Play(_player1, msg.sender, _move);
 	}
 
 	function revealMove(address _player2, Move _move, string memory _secret) public {
@@ -72,6 +103,8 @@ contract RockPaperScissors {
 
 		game.state = State.Finished;
 		game.lastUpdate = block.timestamp;
+
+		emit Finish(msg.sender, _player2, _move, result);
 	}
 
 	function withdraw(address _player, bool _isChallenger) public {
@@ -106,8 +139,8 @@ contract RockPaperScissors {
 		return "";
 	}
 
-	function withdrawAsChallenger(address _player) private {
-		Game storage game = games[msg.sender][_player];
+	function withdrawAsChallenger(address _player2) private {
+		Game storage game = games[msg.sender][_player2];
 		require(game.state == State.Challenged, "No challenged game in progress");
 		require(game.lastUpdate + roundTime < block.timestamp, "Cannot withdraw staked tokens yet");
 
@@ -115,10 +148,12 @@ contract RockPaperScissors {
 
 		game.state = State.ChallengeWithdrawed;
 		game.lastUpdate = block.timestamp;
+
+		emit ChallengerWithdraw(msg.sender, _player2);
 	}
 
-	function withdrawAsChallenged(address _player) private {
-		Game storage game = games[_player][msg.sender];
+	function withdrawAsChallenged(address _player1) private {
+		Game storage game = games[_player1][msg.sender];
 		require(game.state == State.Played, "No played game in progress");
 		require(game.lastUpdate + roundTime < block.timestamp, "Cannot withdraw staked tokens yet");
 
@@ -126,6 +161,8 @@ contract RockPaperScissors {
 
 		game.state = State.Unrevealed;
 		game.lastUpdate = block.timestamp;
+
+		emit ChallengedWithdraw(_player1, msg.sender);
 	}
 
 }
