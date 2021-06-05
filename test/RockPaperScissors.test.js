@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { time } = require('@openzeppelin/test-helpers');
 
 describe("RockPaperScissors contract", () => {
 	let Contract, contract, Token, token, owner, player1, player2;
@@ -224,6 +225,136 @@ describe("RockPaperScissors contract", () => {
 			let game = await contract.games(player1.address, player2.address);
 			expect(game.state).to.equal(5);
 		});
+
+	});
+
+	describe("Withdraw", () => {
+
+		describe("As challenger", () => {
+
+			it("should fail when no challenged game in progress", async () => {
+				try {
+					await contract.connect(player1).withdraw(player2.address, true);
+					expect.fail();
+				} catch(error) {
+					expect(error.message.indexOf("revert No challenged game in progress")).to.be.at.least(0);
+				}
+			});
+
+			it("should fail when did not exceed round time", async () => {
+				await token.connect(player1).approve(contract.address, 10);
+				await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+				time.increase(20 * 60);
+
+				try {
+					await contract.connect(player1).withdraw(player2.address, true);
+					expect.fail();
+				} catch(error) {
+					expect(error.message.indexOf("revert Cannot withdraw staked tokens yet")).to.be.at.least(0);
+				}
+			});
+
+			it("should transfer staked tokens to challenger", async () => {
+				await token.connect(player1).approve(contract.address, 10);
+				await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+				expect(await token.balanceOf(player1.address)).to.equal(90);
+				
+				time.increase(40 * 60);
+
+				await contract.connect(player1).withdraw(player2.address, true);
+
+				expect(await token.balanceOf(player1.address)).to.equal(100);
+			});
+
+			it("should update game state", async () => {
+				await token.connect(player1).approve(contract.address, 10);
+				await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+				time.increase(40 * 60);
+
+				await contract.connect(player1).withdraw(player2.address, true);
+
+				let game = await contract.games(player1.address, player2.address);
+				expect(game.state).to.equal(2);
+			});
+
+		});
+
+		describe("As challenged", () => {
+
+			it("should fail when no game in progress", async () => {
+				try {
+					await contract.connect(player2).withdraw(player1.address, false);
+					expect.fail();
+				} catch(error) {
+					expect(error.message.indexOf("revert No played game in progress")).to.be.at.least(0);
+				}
+			});
+
+			it("should fail when no played game in progress", async () => {
+				await token.connect(player1).approve(contract.address, 10);
+				await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+				try {
+					await contract.connect(player2).withdraw(player1.address, false);
+					expect.fail();
+				} catch(error) {
+					expect(error.message.indexOf("revert No played game in progress")).to.be.at.least(0);
+				}
+			});
+
+			it("should fail when did not exceed round time", async () => {
+				await token.connect(player1).approve(contract.address, 10);
+				await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+				await token.connect(player2).approve(contract.address, 10);
+				await contract.connect(player2).playMove(player1.address, 2);
+
+				time.increase(20 * 60);
+
+				try {
+					await contract.connect(player2).withdraw(player1.address, false);
+					expect.fail();
+				} catch(error) {
+					expect(error.message.indexOf("revert Cannot withdraw staked tokens yet")).to.be.at.least(0);
+				}
+			});
+
+			it("should transfer all staked tokens to challenged player", async () => {
+				await token.connect(player1).approve(contract.address, 10);
+				await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+				await token.connect(player2).approve(contract.address, 10);
+				await contract.connect(player2).playMove(player1.address, 2);
+
+				expect(await token.balanceOf(player2.address)).to.equal(90);
+				
+				time.increase(40 * 60);
+
+				await contract.connect(player2).withdraw(player1.address, false);
+
+				expect(await token.balanceOf(player2.address)).to.equal(110);
+			});
+
+			it("should update game state", async () => {
+				await token.connect(player1).approve(contract.address, 10);
+				await contract.connect(player1).challengePlayer(player2.address, 10, hash);
+
+				await token.connect(player2).approve(contract.address, 10);
+				await contract.connect(player2).playMove(player1.address, 2);
+
+				time.increase(40 * 60);
+
+				await contract.connect(player2).withdraw(player1.address, false);
+
+				let game = await contract.games(player1.address, player2.address);
+				expect(game.state).to.equal(4);
+			});
+
+		});
+
 	});
 
 });

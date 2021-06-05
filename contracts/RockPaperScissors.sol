@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract RockPaperScissors {
 	IERC20 public token;
-	uint public roundTime = 5 minutes;
+	uint public roundTime = 30 minutes;
 
 	enum Move { None, Rock, Paper, Scissor }
 	enum State { NoGame, Challenged, ChallengeWithdrawed, Played, Unrevealed, Finished }
@@ -74,11 +74,8 @@ contract RockPaperScissors {
 		game.lastUpdate = block.timestamp;
 	}
 
-	function withdraw(address _player) public {
-		// 1. Check that game is created and over round limit
-		// 2. If player is challanger and game is in Challanged state, send his/her staked tokens
-		// 3. If player is challanged and game is in Played state, send all staked tokens
-		// 4. Update game
+	function withdraw(address _player, bool _isChallenger) public {
+		_isChallenger ? withdrawAsChallenger(_player) : withdrawAsChallenged(_player);
 	}
 
 
@@ -107,6 +104,28 @@ contract RockPaperScissors {
 		if (_move == Move.Scissor)
 			return "3";
 		return "";
+	}
+
+	function withdrawAsChallenger(address _player) private {
+		Game storage game = games[msg.sender][_player];
+		require(game.state == State.Challenged, "No challenged game in progress");
+		require(game.lastUpdate + roundTime < block.timestamp, "Cannot withdraw staked tokens yet");
+
+		token.transfer(msg.sender, game.stake);
+
+		game.state = State.ChallengeWithdrawed;
+		game.lastUpdate = block.timestamp;
+	}
+
+	function withdrawAsChallenged(address _player) private {
+		Game storage game = games[_player][msg.sender];
+		require(game.state == State.Played, "No played game in progress");
+		require(game.lastUpdate + roundTime < block.timestamp, "Cannot withdraw staked tokens yet");
+
+		token.transfer(msg.sender, game.stake * 2);
+
+		game.state = State.Unrevealed;
+		game.lastUpdate = block.timestamp;
 	}
 
 }
